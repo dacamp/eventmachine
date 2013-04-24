@@ -460,8 +460,7 @@ ConnectionDescriptor::SetConnectPending
 void ConnectionDescriptor::SetConnectPending(bool f)
 {
 	bConnectPending = f;
-	if (f == false && NextHeartbeat)
-		MyEventMachine->ClearHeartbeat(NextHeartbeat, this);
+	MyEventMachine->QueueHeartbeat(this);
 	_UpdateEvents();
 }
 
@@ -766,7 +765,11 @@ void ConnectionDescriptor::Read()
 		
 
 		int r = read (sd, readbuffer, sizeof(readbuffer) - 1);
+#ifdef OS_WIN32
+		int e = WSAGetLastError();
+#else
 		int e = errno;
+#endif
 		//cerr << "<R:" << r << ">";
 
 		if (r > 0) {
@@ -982,11 +985,7 @@ void ConnectionDescriptor::_WriteOutboundData()
 	// Max of 16 outbound pages at a time
 	if (iovcnt > 16) iovcnt = 16;
 
-	#ifdef CC_SUNWspro
-	struct iovec iov[16];
-	#else
-	struct iovec iov[ iovcnt ];
-	#endif
+	iovec iov[16];
 
 	for(int i = 0; i < iovcnt; i++){
 		OutboundPage *op = &(OutboundPages[i]);
@@ -1033,7 +1032,11 @@ void ConnectionDescriptor::_WriteOutboundData()
 	#endif
 
 	bool err = false;
+#ifdef OS_WIN32
+	int e = WSAGetLastError();
+#else
 	int e = errno;
+#endif
 	if (bytes_written < 0) {
 		err = true;
 		bytes_written = 0;
@@ -1664,7 +1667,11 @@ void DatagramDescriptor::Write()
 
 		// The nasty cast to (char*) is needed because Windows is brain-dead.
 		int s = sendto (sd, (char*)op->Buffer, op->Length, 0, (struct sockaddr*)&(op->From), sizeof(op->From));
+#ifdef OS_WIN32
+		int e = WSAGetLastError();
+#else
 		int e = errno;
+#endif
 
 		OutboundDataSize -= op->Length;
 		op->Free();
